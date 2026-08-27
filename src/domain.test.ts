@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePrice, effectiveQuotedPrice, parseMoneyInput, proposePhases, recommendArchitecture, resolveDependencies } from './domain';
+import { calculatePrice, effectiveQuotedPrice, parseMoneyInput, proposePhases, recommendArchitecture, resolveDependencies, summarizeQuoteVersions } from './domain';
 import { initialModules, pricingConfig } from './data';
 
 describe('motor de arquitectura', () => {
@@ -74,5 +74,16 @@ describe('precios y alcance', () => {
     expect(parseMoneyInput('2,500')).toBe(2500);
     expect(parseMoneyInput('S/ 2 500')).toBe(2500);
     expect(parseMoneyInput('')).toBe(0);
+  });
+
+  it('resume solo montos validos de versiones guardadas', () => {
+    const result = summarizeQuoteVersions([
+      { pricing: { quotedPrice: 1200 } },
+      { pricing: { quotedPrice: 1800 } },
+      { pricing: { quotedPrice: 'invalido' } },
+    ]);
+
+    expect(result).toEqual({ count: 3, total: 3000, average: 1000, highest: 1800 });
+    expect(summarizeQuoteVersions([])).toEqual({ count: 0, total: 0, average: 0, highest: 0 });
   });
 });

@@ -57,6 +57,13 @@ export interface Phase {
   amount: number;
 }
 
+export interface QuoteVersionSummary {
+  count: number;
+  total: number;
+  average: number;
+  highest: number;
+}
+
 export const COMPLEXITY_MULTIPLIER: Record<Complexity, number> = {
   BAJA: 1,
   MEDIA: 1.15,
@@ -169,6 +176,23 @@ export function parseMoneyInput(value: string): number {
   if (!digits) return 0;
   const amount = Number(digits);
   return Number.isSafeInteger(amount) ? amount : 0;
+}
+
+export function summarizeQuoteVersions(quotes: Array<Record<string, unknown>>): QuoteVersionSummary {
+  const amounts = quotes.map((quote) => {
+    const pricing = quote.pricing;
+    if (!pricing || typeof pricing !== 'object') return 0;
+    const quotedPrice = (pricing as Record<string, unknown>).quotedPrice;
+    return typeof quotedPrice === 'number' && Number.isFinite(quotedPrice) ? quotedPrice : 0;
+  });
+  const total = amounts.reduce((sum, amount) => sum + amount, 0);
+
+  return {
+    count: quotes.length,
+    total,
+    average: quotes.length > 0 ? total / quotes.length : 0,
+    highest: amounts.length > 0 ? Math.max(...amounts) : 0,
+  };
 }
 
 const PRIORITY_WEIGHT: Record<Priority, number> = {

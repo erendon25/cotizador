@@ -9,6 +9,8 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
+  CreditCard,
+  Database,
   FileText,
   Gauge,
   LayoutDashboard,
@@ -33,6 +35,7 @@ import {
   proposePhases,
   recommendArchitecture,
   resolveDependencies,
+  summarizeQuoteVersions,
   type Intake,
   type ModuleDefinition,
 } from './domain';
@@ -40,8 +43,9 @@ import { initialModules, pricingConfig } from './data';
 import { useAuth } from './auth';
 import { loadWorkspace, saveQuoteSnapshot, saveWorkspaceState } from './storage';
 
-type View = 'dashboard' | 'prospects' | 'quotes' | 'catalog';
+type View = 'dashboard' | 'prospects' | 'quotes' | 'catalog' | 'projects' | 'payments' | 'metrics' | 'settings';
 type Step = 0 | 1 | 2 | 3;
+type SyncStatus = 'loading' | 'saving' | 'saved' | 'error';
 
 interface QuoteDraft {
   client: string;
@@ -84,6 +88,12 @@ const navItems = [
   { id: 'catalog' as View, label: 'Tarifario', icon: BookOpen },
 ];
 
+const managementNavItems = [
+  { id: 'projects' as View, label: 'Proyectos', icon: BriefcaseBusiness },
+  { id: 'payments' as View, label: 'Pagos', icon: CreditCard },
+  { id: 'metrics' as View, label: 'Metricas', icon: BarChart3 },
+];
+
 function App() {
   const { user, signOut } = useAuth();
   const [view, setView] = useState<View>('dashboard');
@@ -95,7 +105,7 @@ function App() {
   const [modules, setModules] = useState<ModuleDefinition[]>(initialModules);
   const [savedQuotes, setSavedQuotes] = useState<Array<Record<string, unknown>>>([]);
   const [workspaceReady, setWorkspaceReady] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'loading' | 'saving' | 'saved' | 'error'>('loading');
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
 
   useEffect(() => {
     let active = true;
@@ -163,6 +173,11 @@ function App() {
     setMobileNav(false);
   };
 
+  const navigate = (nextView: View) => {
+    setView(nextView);
+    setMobileNav(false);
+  };
+
   const updateIntake = <K extends keyof Intake>(key: K, value: Intake[K]) => {
     setDraft((current) => ({ ...current, intake: { ...current.intake, [key]: value } }));
   };
@@ -209,6 +224,10 @@ function App() {
     if (view === 'dashboard') return <Dashboard onNew={startQuote} onCatalog={() => setView('catalog')} savedQuotes={savedQuotes} userName={user.name} draft={draft} currentPrice={currentPrice} activeModules={resolvedIds.length} />;
     if (view === 'prospects') return <Prospects onNew={startQuote} />;
     if (view === 'catalog') return <Catalog modules={modules} setModules={setModules} query={query} onTariffChange={() => setDraft((current) => ({ ...current, quotedPrice: null }))} />;
+    if (view === 'projects') return <Projects onNew={startQuote} />;
+    if (view === 'payments') return <Payments />;
+    if (view === 'metrics') return <Metrics savedQuotes={savedQuotes} />;
+    if (view === 'settings') return <SettingsView user={user} syncStatus={syncStatus} activeModules={modules.filter((module) => module.active).length} onCatalog={() => navigate('catalog')} />;
     return (
       <QuoteWorkspace
         draft={draft}
@@ -243,7 +262,7 @@ function App() {
             <button
               key={item.id}
               className={view === item.id ? 'active' : ''}
-              onClick={() => { setView(item.id); setMobileNav(false); }}
+              onClick={() => navigate(item.id)}
             >
               <item.icon size={18} />
               <span>{item.label}</span>
@@ -251,12 +270,15 @@ function App() {
             </button>
           ))}
           <p>GESTION</p>
-          <button><BriefcaseBusiness size={18} /><span>Proyectos</span></button>
-          <button><CircleDollarSign size={18} /><span>Pagos</span></button>
-          <button><BarChart3 size={18} /><span>Metricas</span></button>
+          {managementNavItems.map((item) => (
+            <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => navigate(item.id)}>
+              <item.icon size={18} />
+              <span>{item.label}</span>
+            </button>
+          ))}
         </nav>
         <div className="sidebar-bottom">
-          <button><Settings size={18} /><span>Configuracion</span></button>
+          <button className={view === 'settings' ? 'active' : ''} onClick={() => navigate('settings')}><Settings size={18} /><span>Configuracion</span></button>
           <div className="user-card">
             {user.image ? <img className="avatar avatar-image" src={user.image} alt="" /> : <div className="avatar">{user.name?.slice(0, 2).toUpperCase()}</div>}
             <div><strong>{user.name}</strong><span>{user.email}</span></div>
@@ -336,6 +358,38 @@ function Metric({ label, value, detail, icon: Icon }: { label: string; value: st
 
 function Prospects({ onNew }: { onNew: () => void }) {
   return <><div className="page-heading"><div><p className="eyebrow">PIPELINE</p><h1>Prospectos</h1><p>Oportunidades activas y proximos contactos.</p></div><button className="primary-button" onClick={onNew}><Plus size={18} />Nueva cotizacion</button></div><section className="panel empty-panel"><div className="section-heading"><div><h2>0 prospectos activos</h2><p>No hay actividad comercial registrada.</p></div></div><div className="empty-state"><span><Users size={22} /></span><h3>Sin prospectos</h3><p>Los nuevos prospectos apareceran aqui cuando se registren.</p></div></section></>;
+}
+
+function Projects({ onNew }: { onNew: () => void }) {
+  return <><div className="page-heading"><div><p className="eyebrow">ENTREGAS</p><h1>Proyectos</h1><p>Trabajos activos originados desde cotizaciones aceptadas.</p></div><button className="primary-button" onClick={onNew}><Plus size={18} />Nueva cotizacion</button></div><section className="panel empty-panel"><div className="section-heading"><div><h2>0 proyectos activos</h2><p>No existen cotizaciones convertidas en proyecto.</p></div></div><div className="empty-state"><span><BriefcaseBusiness size={22} /></span><h3>Sin proyectos activos</h3><p>Los proyectos apareceran aqui despues de cerrar una cotizacion.</p></div></section></>;
+}
+
+function Payments() {
+  return <><div className="page-heading"><div><p className="eyebrow">FINANZAS</p><h1>Pagos</h1><p>Cobros, saldos y vencimientos asociados a proyectos.</p></div></div><section className="metric-grid"><Metric label="Total por cobrar" value={money(0)} detail="Sin cuentas abiertas" icon={CircleDollarSign} /><Metric label="Cobrado" value={money(0)} detail="Sin pagos registrados" icon={CreditCard} /><Metric label="Saldo pendiente" value={money(0)} detail="Sin saldos pendientes" icon={Gauge} /><Metric label="Vencidos" value="0" detail="Sin pagos vencidos" icon={ClipboardList} /></section><section className="panel empty-panel"><div className="section-heading"><div><h2>Movimientos</h2><p>Historial de pagos registrados.</p></div></div><div className="empty-state"><span><CreditCard size={22} /></span><h3>Sin movimientos</h3><p>Los pagos apareceran cuando exista un proyecto con un cobro asociado.</p></div></section></>;
+}
+
+function Metrics({ savedQuotes }: { savedQuotes: Array<Record<string, unknown>> }) {
+  const summary = summarizeQuoteVersions(savedQuotes);
+  const quotePrice = (quote: Record<string, unknown>) => {
+    const pricing = quote.pricing;
+    if (!pricing || typeof pricing !== 'object') return 0;
+    const value = (pricing as Record<string, unknown>).quotedPrice;
+    return typeof value === 'number' ? value : 0;
+  };
+  const quoteText = (quote: Record<string, unknown>, key: string, fallback: string) => typeof quote[key] === 'string' ? String(quote[key]) : fallback;
+
+  return <><div className="page-heading"><div><p className="eyebrow">ANALISIS COMERCIAL</p><h1>Metricas</h1><p>Resultados calculados desde versiones guardadas en Neon.</p></div></div><section className="metric-grid"><Metric label="Versiones guardadas" value={String(summary.count)} detail="Snapshots disponibles" icon={FileText} /><Metric label="Monto versionado" value={money(summary.total)} detail="Suma de precios cotizados" icon={CircleDollarSign} /><Metric label="Ticket promedio" value={money(summary.average)} detail="Promedio por version" icon={BarChart3} /><Metric label="Mayor cotizacion" value={money(summary.highest)} detail="Valor maximo versionado" icon={Gauge} /></section><section className="panel activity-panel"><div className="section-heading"><div><h2>Versiones recientes</h2><p>Cotizaciones inmutables guardadas.</p></div></div>{savedQuotes.length === 0 ? <div className="empty-state compact"><span><BarChart3 size={20} /></span><h3>Sin datos para analizar</h3></div> : <div className="responsive-table"><table><thead><tr><th>Codigo</th><th>Proyecto</th><th>Version</th><th>Precio cotizado</th></tr></thead><tbody>{savedQuotes.slice().reverse().map((quote, index) => <tr key={`${quoteText(quote, 'id', 'cotizacion')}-${index}`}><td><strong>{quoteText(quote, 'id', 'Sin codigo')}</strong></td><td>{quoteText(quote, 'project', 'Sin nombre')}</td><td>{quoteText(quote, 'version', 'V1')}</td><td>{money(quotePrice(quote))}</td></tr>)}</tbody></table></div>}</section></>;
+}
+
+function SettingsView({ user, syncStatus, activeModules, onCatalog }: { user: { name: string; email: string }; syncStatus: SyncStatus; activeModules: number; onCatalog: () => void }) {
+  const syncLabel: Record<SyncStatus, string> = {
+    loading: 'Cargando datos',
+    saving: 'Guardando cambios',
+    saved: 'Conectado y sincronizado',
+    error: 'Error de sincronizacion',
+  };
+
+  return <><div className="page-heading"><div><p className="eyebrow">ADMINISTRACION</p><h1>Configuracion</h1><p>Cuenta, persistencia y parametros comerciales.</p></div></div><div className="settings-stack"><section className="panel settings-panel"><div className="section-heading"><div><h2>Cuenta</h2><p>Identidad utilizada para aislar los datos.</p></div></div><div className="settings-row"><span><UserRound size={19} /></span><div><strong>{user.name}</strong><small>{user.email}</small></div><em>Google</em></div><div className="settings-row"><span><Database size={19} /></span><div><strong>Neon</strong><small>Datos comerciales y autenticacion</small></div><em className={syncStatus === 'error' ? 'error' : ''}>{syncLabel[syncStatus]}</em></div></section><section className="panel settings-panel"><div className="section-heading"><div><h2>Configuracion comercial</h2><p>Parametros activos para nuevos borradores.</p></div></div><div className="settings-row"><span><CircleDollarSign size={19} /></span><div><strong>Valor hora interno</strong><small>{money(pricingConfig.hourlyRate)} por hora</small></div><em>{pricingConfig.targetMargin * 100}% margen</em></div><div className="settings-row"><span><BookOpen size={19} /></span><div><strong>Tarifario</strong><small>{activeModules} modulos habilitados</small></div><button className="secondary-button" onClick={onCatalog}>Abrir tarifario <ChevronRight size={16} /></button></div></section></div></>;
 }
 
 function Catalog({ modules, setModules, query, onTariffChange }: { modules: ModuleDefinition[]; setModules: React.Dispatch<React.SetStateAction<ModuleDefinition[]>>; query: string; onTariffChange: () => void }) {

@@ -30,3 +30,10 @@
 - Normalizacion consistente de presupuesto, precio cotizado y precios del tarifario.
 - Soporte para montos escritos con separadores como `2.500`, `2,500` y `S/ 2 500`.
 - Actualizacion inmediata del presupuesto declarado en el resumen y dashboard.
+
+## 0.2.3 - 2026-08-27
+
+- Navegacion funcional para Proyectos, Pagos, Metricas y Configuracion.
+- Metricas calculadas exclusivamente desde snapshots guardados en Neon.
+- Configuracion con estado de cuenta, sincronizacion y acceso al tarifario.
+- Estados vacios reales para proyectos y pagos sin registros.
