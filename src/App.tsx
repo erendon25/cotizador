@@ -20,6 +20,7 @@ import {
   Settings,
   SlidersHorizontal,
   Sparkles,
+  RotateCcw,
   UserRound,
   Users,
   X,
@@ -27,6 +28,7 @@ import {
 import {
   calculatePrice,
   discountStatus,
+  effectiveQuotedPrice,
   proposePhases,
   recommendArchitecture,
   resolveDependencies,
@@ -48,14 +50,14 @@ interface QuoteDraft {
   problem: string;
   intake: Intake;
   selectedIds: string[];
-  quotedPrice: number;
+  quotedPrice: number | null;
 }
 
 const emptyDraft: QuoteDraft = {
   client: '',
   company: '',
   project: '',
-  budget: 2000,
+  budget: 0,
   problem: '',
   intake: {
     branches: 1,
@@ -68,7 +70,7 @@ const emptyDraft: QuoteDraft = {
     acceptsMonthlyCosts: false,
   },
   selectedIds: [],
-  quotedPrice: 0,
+  quotedPrice: null,
 };
 
 const money = (value: number) =>
@@ -100,7 +102,9 @@ function App() {
     setSyncStatus('loading');
     loadWorkspace<QuoteDraft>().then((workspace) => {
       if (!active) return;
-      setDraft(workspace.draft ? { ...emptyDraft, ...workspace.draft } : emptyDraft);
+      setDraft(workspace.draft
+        ? { ...emptyDraft, ...workspace.draft, quotedPrice: workspace.draft.quotedPrice || null }
+        : emptyDraft);
       setModules(workspace.modules ?? initialModules);
       setSavedQuotes(workspace.quotes);
       setWorkspaceReady(true);
@@ -144,7 +148,7 @@ function App() {
     [resolvedIds, modules],
   );
   const recommendation = useMemo(() => recommendArchitecture(draft.intake), [draft.intake]);
-  const currentPrice = draft.quotedPrice || pricing.suggestedPrice;
+  const currentPrice = effectiveQuotedPrice(draft.quotedPrice, pricing.suggestedPrice);
   const discount = discountStatus(pricing.suggestedPrice, currentPrice, pricingConfig);
   const phases = useMemo(
     () => proposePhases(resolvedIds, modules, draft.budget),
@@ -165,6 +169,7 @@ function App() {
   const toggleModule = (id: string) => {
     setDraft((current) => ({
       ...current,
+      quotedPrice: null,
       selectedIds: current.selectedIds.includes(id)
         ? current.selectedIds.filter((moduleId) => moduleId !== id)
         : [...current.selectedIds, id],
@@ -200,9 +205,9 @@ function App() {
   };
 
   const renderPage = () => {
-    if (view === 'dashboard') return <Dashboard onNew={startQuote} onCatalog={() => setView('catalog')} savedQuotes={savedQuotes} userName={user.name} />;
+    if (view === 'dashboard') return <Dashboard onNew={startQuote} onCatalog={() => setView('catalog')} savedQuotes={savedQuotes} userName={user.name} draft={draft} currentPrice={currentPrice} activeModules={resolvedIds.length} />;
     if (view === 'prospects') return <Prospects onNew={startQuote} />;
-    if (view === 'catalog') return <Catalog modules={modules} setModules={setModules} query={query} />;
+    if (view === 'catalog') return <Catalog modules={modules} setModules={setModules} query={query} onTariffChange={() => setDraft((current) => ({ ...current, quotedPrice: null }))} />;
     return (
       <QuoteWorkspace
         draft={draft}
@@ -279,13 +284,14 @@ function App() {
   );
 }
 
-function Dashboard({ onNew, onCatalog, savedQuotes, userName }: { onNew: () => void; onCatalog: () => void; savedQuotes: Array<Record<string, unknown>>; userName: string }) {
+function Dashboard({ onNew, onCatalog, savedQuotes, userName, draft, currentPrice, activeModules }: { onNew: () => void; onCatalog: () => void; savedQuotes: Array<Record<string, unknown>>; userName: string; draft: QuoteDraft; currentPrice: number; activeModules: number }) {
   const firstName = userName.trim().split(/\s+/)[0] || 'usuario';
   const date = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toUpperCase();
   const quotedTotal = savedQuotes.reduce((sum, quote) => {
     const quotePricing = quote.pricing as { quotedPrice?: unknown } | undefined;
     return sum + (typeof quotePricing?.quotedPrice === 'number' ? quotePricing.quotedPrice : 0);
   }, 0);
+  const draftAmount = activeModules > 0 ? currentPrice : 0;
 
   return (
     <>
@@ -294,10 +300,10 @@ function Dashboard({ onNew, onCatalog, savedQuotes, userName }: { onNew: () => v
         <button className="secondary-button"><SlidersHorizontal size={17} />Este mes</button>
       </div>
       <section className="metric-grid">
-        <Metric label="Pipeline activo" value={money(0)} detail="0 oportunidades" icon={Gauge} />
-        <Metric label="Versiones guardadas" value={String(savedQuotes.length)} detail={`${money(quotedTotal)} cotizados`} icon={FileText} />
-        <Metric label="Ventas cerradas" value={money(0)} detail="Sin cierres registrados" icon={CircleDollarSign} />
-        <Metric label="Tasa de cierre" value="0%" detail="Sin historial suficiente" icon={BarChart3} />
+        <Metric label="Presupuesto del borrador" value={money(draft.budget)} detail="Monto declarado por el cliente" icon={Gauge} />
+        <Metric label="Precio actual" value={money(draftAmount)} detail={`${activeModules} modulos habilitados`} icon={CircleDollarSign} />
+        <Metric label="Versiones guardadas" value={String(savedQuotes.length)} detail="Snapshots inmutables" icon={FileText} />
+        <Metric label="Monto versionado" value={money(quotedTotal)} detail="Suma de versiones guardadas" icon={BarChart3} />
       </section>
       <div className="dashboard-grid">
         <section className="panel pipeline-panel">
@@ -331,10 +337,15 @@ function Prospects({ onNew }: { onNew: () => void }) {
   return <><div className="page-heading"><div><p className="eyebrow">PIPELINE</p><h1>Prospectos</h1><p>Oportunidades activas y proximos contactos.</p></div><button className="primary-button" onClick={onNew}><Plus size={18} />Nueva cotizacion</button></div><section className="panel empty-panel"><div className="section-heading"><div><h2>0 prospectos activos</h2><p>No hay actividad comercial registrada.</p></div></div><div className="empty-state"><span><Users size={22} /></span><h3>Sin prospectos</h3><p>Los nuevos prospectos apareceran aqui cuando se registren.</p></div></section></>;
 }
 
-function Catalog({ modules, setModules, query }: { modules: ModuleDefinition[]; setModules: React.Dispatch<React.SetStateAction<ModuleDefinition[]>>; query: string }) {
+function Catalog({ modules, setModules, query, onTariffChange }: { modules: ModuleDefinition[]; setModules: React.Dispatch<React.SetStateAction<ModuleDefinition[]>>; query: string; onTariffChange: () => void }) {
   const filtered = modules.filter((module) => `${module.name} ${module.category}`.toLowerCase().includes(query.toLowerCase()));
-  const updatePrice = (id: string, price: number) => setModules((current) => current.map((module) => module.id === id ? { ...module, price: Math.max(0, price) } : module));
-  return <><div className="page-heading"><div><p className="eyebrow">CONFIGURACION COMERCIAL</p><h1>Tarifario</h1><p>Precios base, horas y dependencias. Los cambios no alteran snapshots guardados.</p></div><button className="primary-button"><Plus size={18} />Nuevo modulo</button></div><section className="panel"><div className="section-heading"><div><h2>{filtered.length} modulos activos</h2><p>Valor hora interno: {money(pricingConfig.hourlyRate)} · Margen objetivo: {pricingConfig.targetMargin * 100}%</p></div></div><div className="responsive-table"><table><thead><tr><th>Modulo</th><th>Complejidad</th><th>Horas</th><th>Dependencias</th><th>Precio base</th></tr></thead><tbody>{filtered.map((module) => <tr key={module.id}><td><strong>{module.name}</strong><small>{module.category} · {module.priority}</small></td><td><span className="status neutral">{module.complexity.replace('_', ' ')}</span></td><td>{module.hours} h</td><td>{module.dependencies.length ? module.dependencies.join(', ') : 'Ninguna'}</td><td><label className="price-input"><span>S/</span><input type="number" value={module.price} onChange={(event) => updatePrice(module.id, Number(event.target.value))} /></label></td></tr>)}</tbody></table></div></section></>;
+  const activeCount = modules.filter((module) => module.active).length;
+  const updateModule = (id: string, changes: Partial<Pick<ModuleDefinition, 'price' | 'active'>>) => {
+    setModules((current) => current.map((module) => module.id === id ? { ...module, ...changes } : module));
+    onTariffChange();
+  };
+
+  return <><div className="page-heading"><div><p className="eyebrow">CONFIGURACION COMERCIAL</p><h1>Tarifario</h1><p>Precios base, horas y dependencias. Los cambios actualizan borradores, no snapshots guardados.</p></div><button className="primary-button"><Plus size={18} />Nuevo modulo</button></div><section className="panel"><div className="section-heading catalog-heading"><div><h2>{activeCount} modulos habilitados</h2><p>Valor hora interno: {money(pricingConfig.hourlyRate)} · Margen objetivo: {pricingConfig.targetMargin * 100}%</p></div></div><div className="responsive-table"><table><thead><tr><th>Modulo</th><th>Estado</th><th>Complejidad</th><th>Horas</th><th>Dependencias</th><th>Precio base</th></tr></thead><tbody>{filtered.map((module) => <tr key={module.id} className={module.active ? '' : 'inactive-row'}><td><strong>{module.name}</strong><small>{module.category} · {module.priority}</small></td><td><label className="catalog-toggle"><input type="checkbox" checked={module.active} onChange={(event) => updateModule(module.id, { active: event.target.checked })} /><i /><span>{module.active ? 'Habilitado' : 'Deshabilitado'}</span></label></td><td><span className="status neutral">{module.complexity.replace('_', ' ')}</span></td><td>{module.hours} h</td><td>{module.dependencies.length ? module.dependencies.join(', ') : 'Ninguna'}</td><td><label className="price-input"><span>S/</span><input type="number" min="0" value={module.price} disabled={!module.active} onChange={(event) => updateModule(module.id, { price: Math.max(0, Number(event.target.value)) })} /></label></td></tr>)}</tbody></table></div></section></>;
 }
 
 interface QuoteWorkspaceProps {
@@ -398,13 +409,14 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 
 function ModuleStep({ modules, draft, resolvedIds, toggleModule, dependenciesAdded }: { modules: ModuleDefinition[]; draft: QuoteDraft; resolvedIds: string[]; toggleModule: (id: string) => void; dependenciesAdded: number }) {
-  const categories = [...new Set(modules.map((module) => module.category))];
-  return <div className="form-content"><div className="form-title"><span><PackageOpen size={20} /></span><div><h2>Alcance por modulos</h2><p>Selecciona necesidades; las dependencias tecnicas se incorporan al calculo.</p></div></div>{dependenciesAdded > 0 ? <div className="inline-alert"><Check size={18} /><span>Se agregaron {dependenciesAdded} dependencias necesarias. Estan marcadas como incluidas.</span></div> : null}<div className="module-groups">{categories.map((category) => <div key={category}><h3>{category}</h3><div className="module-grid">{modules.filter((module) => module.category === category).map((module) => { const direct = draft.selectedIds.includes(module.id); const dependency = resolvedIds.includes(module.id) && !direct; return <button key={module.id} className={`module-option ${direct || dependency ? 'selected' : ''}`} onClick={() => toggleModule(module.id)}><span className="check-box">{direct || dependency ? <Check size={15} /> : null}</span><span><strong>{module.name}</strong><small>{module.hours} h · {module.complexity.replace('_', ' ')}</small></span><em>{dependency ? 'Dependencia' : money(module.price)}</em></button>; })}</div></div>)}</div></div>;
+  const enabledModules = modules.filter((module) => module.active);
+  const categories = [...new Set(enabledModules.map((module) => module.category))];
+  return <div className="form-content"><div className="form-title"><span><PackageOpen size={20} /></span><div><h2>Alcance por modulos</h2><p>Selecciona necesidades; las dependencias tecnicas se incorporan al calculo.</p></div></div>{dependenciesAdded > 0 ? <div className="inline-alert"><Check size={18} /><span>Se agregaron {dependenciesAdded} dependencias necesarias. Estan marcadas como incluidas.</span></div> : null}<div className="module-groups">{categories.map((category) => <div key={category}><h3>{category}</h3><div className="module-grid">{enabledModules.filter((module) => module.category === category).map((module) => { const direct = draft.selectedIds.includes(module.id); const dependency = resolvedIds.includes(module.id) && !direct; return <button key={module.id} className={`module-option ${direct || dependency ? 'selected' : ''}`} onClick={() => toggleModule(module.id)}><span className="check-box">{direct || dependency ? <Check size={15} /> : null}</span><span><strong>{module.name}</strong><small>{module.hours} h · {module.complexity.replace('_', ' ')}</small></span><em>{dependency ? 'Dependencia' : money(module.price)}</em></button>; })}</div></div>)}</div></div>;
 }
 
 function PriceStep({ draft, setDraft, pricing, currentPrice, discount, phases, modules }: { draft: QuoteDraft; setDraft: React.Dispatch<React.SetStateAction<QuoteDraft>>; pricing: ReturnType<typeof calculatePrice>; currentPrice: number; discount: ReturnType<typeof discountStatus>; phases: ReturnType<typeof proposePhases>; modules: ModuleDefinition[] }) {
   const underBudget = draft.budget < pricing.suggestedPrice;
-  return <div className="form-content"><div className="form-title"><span><CircleDollarSign size={20} /></span><div><h2>Precio y estrategia comercial</h2><p>El presupuesto orienta las fases, pero no redefine el valor del trabajo.</p></div></div><div className="price-breakdown"><div><span>Subtotal por modulos</span><strong>{money(pricing.moduleSubtotal)}</strong></div><div><span>Costo interno</span><strong>{money(pricing.technicalCost)}</strong></div><div><span>Minimo con margen</span><strong>{money(pricing.minimumPrice)}</strong></div><div className="highlight"><span>Precio sugerido</span><strong>{money(pricing.suggestedPrice)}</strong></div></div><label className="quoted-field"><span>Precio a cotizar</span><div className="money-field"><span>S/</span><input type="number" min="0" value={currentPrice} onChange={(event) => setDraft((current) => ({ ...current, quotedPrice: Number(event.target.value) }))} /></div><small className={discount.label.toLowerCase()}>Descuento {discount.percent.toFixed(1)}% · Estado {discount.label}</small></label>{underBudget ? <div className="budget-warning"><strong>El presupuesto no cubre el alcance completo</strong><p>Faltan {money(pricing.suggestedPrice - draft.budget)}. No se aplico ningun descuento automatico: la opcion responsable es conservar el precio y dividir el alcance.</p></div> : null}<div className="phase-list"><div className="phase-heading"><h3>Propuesta por fases</h3><span>Total preservado: {money(phases.reduce((sum, phase) => sum + phase.amount, 0))}</span></div>{phases.map((phase) => <article key={phase.name}><div><span>{phase.name}</span><strong>{money(phase.amount)}</strong></div><p>{phase.moduleIds.map((id) => modules.find((module) => module.id === id)?.name).filter(Boolean).join(' · ')}</p></article>)}</div></div>;
+  return <div className="form-content"><div className="form-title"><span><CircleDollarSign size={20} /></span><div><h2>Precio y estrategia comercial</h2><p>El presupuesto orienta las fases, pero no redefine el valor del trabajo.</p></div></div><div className="price-breakdown"><div><span>Subtotal por modulos</span><strong>{money(pricing.moduleSubtotal)}</strong></div><div><span>Costo interno</span><strong>{money(pricing.technicalCost)}</strong></div><div><span>Minimo con margen</span><strong>{money(pricing.minimumPrice)}</strong></div><div className="highlight"><span>Precio sugerido</span><strong>{money(pricing.suggestedPrice)}</strong></div></div><label className="quoted-field"><span>Precio a cotizar</span><div className="quoted-input-row"><div className="money-field"><span>S/</span><input type="number" min="0" value={currentPrice} onChange={(event) => setDraft((current) => ({ ...current, quotedPrice: Number(event.target.value) }))} /></div><button type="button" className="icon-button" onClick={() => setDraft((current) => ({ ...current, quotedPrice: null }))} title="Usar precio sugerido actualizado" aria-label="Usar precio sugerido actualizado"><RotateCcw size={16} /></button></div><small>{draft.quotedPrice === null ? 'Sincronizado con el tarifario actual' : 'Ajuste comercial manual'}</small><small className={discount.label.toLowerCase()}>Descuento {discount.percent.toFixed(1)}% · Estado {discount.label}</small></label>{underBudget ? <div className="budget-warning"><strong>El presupuesto no cubre el alcance completo</strong><p>Faltan {money(pricing.suggestedPrice - draft.budget)}. No se aplico ningun descuento automatico: la opcion responsable es conservar el precio y dividir el alcance.</p></div> : null}<div className="phase-list"><div className="phase-heading"><h3>Propuesta por fases</h3><span>Total preservado: {money(phases.reduce((sum, phase) => sum + phase.amount, 0))}</span></div>{phases.map((phase) => <article key={phase.name}><div><span>{phase.name}</span><strong>{money(phase.amount)}</strong></div><p>{phase.moduleIds.map((id) => modules.find((module) => module.id === id)?.name).filter(Boolean).join(' · ')}</p></article>)}</div></div>;
 }
 
 export default App;

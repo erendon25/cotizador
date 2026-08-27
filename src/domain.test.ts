@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePrice, proposePhases, recommendArchitecture, resolveDependencies } from './domain';
+import { calculatePrice, effectiveQuotedPrice, proposePhases, recommendArchitecture, resolveDependencies } from './domain';
 import { initialModules, pricingConfig } from './data';
 
 describe('motor de arquitectura', () => {
@@ -46,5 +46,25 @@ describe('precios y alcance', () => {
     const full = calculatePrice(selected, initialModules, pricingConfig).moduleSubtotal;
     expect(phases.length).toBeGreaterThan(1);
     expect(phasedTotal).toBeCloseTo(full, 4);
+  });
+
+  it('recalcula un borrador con la tarifa vigente cuando no hay ajuste manual', () => {
+    const original = calculatePrice(['ventas'], initialModules, pricingConfig);
+    const updatedModules = initialModules.map((module) => module.id === 'ventas' ? { ...module, price: 900 } : module);
+    const updated = calculatePrice(['ventas'], updatedModules, pricingConfig);
+
+    expect(updated.suggestedPrice).toBeGreaterThan(original.suggestedPrice);
+    expect(effectiveQuotedPrice(null, updated.suggestedPrice)).toBe(updated.suggestedPrice);
+    expect(effectiveQuotedPrice(750, updated.suggestedPrice)).toBe(750);
+  });
+
+  it('excluye modulos deshabilitados y sus dependientes del alcance vivo', () => {
+    const modules = initialModules.map((module) => module.id === 'productos' ? { ...module, active: false } : module);
+    const selected = resolveDependencies(['pos'], modules);
+
+    expect(selected).not.toContain('productos');
+    expect(selected).not.toContain('ventas');
+    expect(selected).not.toContain('pos');
+    expect(calculatePrice(['productos'], modules, pricingConfig).suggestedPrice).toBe(0);
   });
 });

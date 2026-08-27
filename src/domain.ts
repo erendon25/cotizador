@@ -118,13 +118,15 @@ export function resolveDependencies(selectedIds: string[], modules: ModuleDefini
   const byId = new Map(modules.map((module) => [module.id, module]));
   const resolved = new Set<string>();
 
-  const visit = (id: string, chain: Set<string>) => {
-    if (resolved.has(id) || chain.has(id)) return;
+  const visit = (id: string, chain: Set<string>): boolean => {
+    if (resolved.has(id)) return true;
+    if (chain.has(id)) return false;
     const module = byId.get(id);
-    if (!module || !module.active) return;
+    if (!module || !module.active) return false;
     const nextChain = new Set(chain).add(id);
-    module.dependencies.forEach((dependency) => visit(dependency, nextChain));
+    if (!module.dependencies.every((dependency) => visit(dependency, nextChain))) return false;
     resolved.add(id);
+    return true;
   };
 
   selectedIds.forEach((id) => visit(id, new Set()));
@@ -136,7 +138,7 @@ export function calculatePrice(
   modules: ModuleDefinition[],
   config: PricingConfig,
 ): PriceResult {
-  const selected = modules.filter((module) => selectedIds.includes(module.id));
+  const selected = modules.filter((module) => module.active && selectedIds.includes(module.id));
   const moduleSubtotal = selected.reduce(
     (total, module) => total + module.price * COMPLEXITY_MULTIPLIER[module.complexity],
     0,
@@ -156,6 +158,10 @@ export function calculatePrice(
     totalHours,
     estimatedWeeks: Math.max(1, Math.ceil(rawWeeks * (1 + config.deliveryBuffer))),
   };
+}
+
+export function effectiveQuotedPrice(quotedPrice: number | null, suggestedPrice: number): number {
+  return quotedPrice ?? suggestedPrice;
 }
 
 const PRIORITY_WEIGHT: Record<Priority, number> = {

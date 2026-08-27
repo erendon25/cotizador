@@ -17,3 +17,10 @@
 - Persistencia de borradores, tarifario y versiones en Neon Data API.
 - Esquema PostgreSQL con indices, RLS y aislamiento por usuario.
 - Estado visible de sincronizacion con Neon y cierre de sesion.
+
+## 0.2.1 - 2026-08-27
+
+- Recalculo inmediato de borradores al editar precios o habilitar modulos del tarifario.
+- Separacion explicita entre precio sugerido automatico y ajuste comercial manual.
+- Metricas del dashboard derivadas del borrador y de snapshots reales.
+- Exclusion de modulos deshabilitados y de dependientes con requisitos inactivos.

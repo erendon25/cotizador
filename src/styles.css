@@ -120,6 +120,14 @@ td small { margin-top: 2px; color: #92979d; font-size: 10px; }
 .status.negociacion { color: #77448e; background: #f4ebf8; }
 .status.levantamiento { color: #416b94; background: #eaf2f9; }
 .status.neutral { color: #555c63; background: #eef0ed; }
+.inactive-row { opacity: .58; }
+.catalog-toggle { display: inline-grid; grid-template-columns: 32px auto; align-items: center; gap: 7px; cursor: pointer; }
+.catalog-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.catalog-toggle i { position: relative; width: 32px; height: 18px; background: #cfd2ce; border-radius: 10px; transition: .15s; }
+.catalog-toggle i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: white; border-radius: 50%; transition: .15s; }
+.catalog-toggle input:checked + i { background: var(--green); }
+.catalog-toggle input:checked + i::after { transform: translateX(14px); }
+.catalog-toggle span { color: #676d73; font-size: 9px; font-weight: 700; }
 
 .quote-page { max-width: 1260px; margin: 0 auto; }
 .quote-heading { align-items: center; }
@@ -212,6 +220,7 @@ input:focus, select:focus, textarea:focus { border-color: #5a987c; box-shadow: 0
 .price-breakdown .highlight { background: #edf6f1; border-color: #c9ded4; }
 .price-breakdown .highlight strong { color: var(--green); }
 .quoted-field { max-width: 260px; margin-bottom: 18px; }
+.quoted-input-row { display: grid; grid-template-columns: minmax(0, 1fr) 36px; align-items: center; gap: 7px; }
 .quoted-field small.normal { color: var(--green); }
 .quoted-field small.advertencia { color: var(--amber); }
 .quoted-field small.critico { color: var(--red); }
