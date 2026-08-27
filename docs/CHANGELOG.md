@@ -24,3 +24,9 @@
 - Separacion explicita entre precio sugerido automatico y ajuste comercial manual.
 - Metricas del dashboard derivadas del borrador y de snapshots reales.
 - Exclusion de modulos deshabilitados y de dependientes con requisitos inactivos.
+
+## 0.2.2 - 2026-08-27
+
+- Normalizacion consistente de presupuesto, precio cotizado y precios del tarifario.
+- Soporte para montos escritos con separadores como `2.500`, `2,500` y `S/ 2 500`.
+- Actualizacion inmediata del presupuesto declarado en el resumen y dashboard.

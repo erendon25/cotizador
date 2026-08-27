@@ -164,6 +164,13 @@ export function effectiveQuotedPrice(quotedPrice: number | null, suggestedPrice:
   return quotedPrice ?? suggestedPrice;
 }
 
+export function parseMoneyInput(value: string): number {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return 0;
+  const amount = Number(digits);
+  return Number.isSafeInteger(amount) ? amount : 0;
+}
+
 const PRIORITY_WEIGHT: Record<Priority, number> = {
   CRITICO: 0,
   IMPORTANTE: 1,

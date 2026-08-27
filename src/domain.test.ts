@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePrice, effectiveQuotedPrice, proposePhases, recommendArchitecture, resolveDependencies } from './domain';
+import { calculatePrice, effectiveQuotedPrice, parseMoneyInput, proposePhases, recommendArchitecture, resolveDependencies } from './domain';
 import { initialModules, pricingConfig } from './data';
 
 describe('motor de arquitectura', () => {
@@ -66,5 +66,13 @@ describe('precios y alcance', () => {
     expect(selected).not.toContain('ventas');
     expect(selected).not.toContain('pos');
     expect(calculatePrice(['productos'], modules, pricingConfig).suggestedPrice).toBe(0);
+  });
+
+  it('normaliza montos escritos con separadores habituales', () => {
+    expect(parseMoneyInput('2500')).toBe(2500);
+    expect(parseMoneyInput('2.500')).toBe(2500);
+    expect(parseMoneyInput('2,500')).toBe(2500);
+    expect(parseMoneyInput('S/ 2 500')).toBe(2500);
+    expect(parseMoneyInput('')).toBe(0);
   });
 });
