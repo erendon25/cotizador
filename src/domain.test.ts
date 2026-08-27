@@ -58,6 +58,17 @@ describe('precios y alcance', () => {
     expect(effectiveQuotedPrice(750, updated.suggestedPrice)).toBe(750);
   });
 
+  it('respeta el precio exacto del tarifario sin recargos ocultos ni minimo forzado', () => {
+    const module = { ...initialModules[0], id: 'exacto', price: 35, hours: 80, complexity: 'MUY_ALTA' as const };
+    const result = calculatePrice(['exacto'], [module], pricingConfig);
+    const phases = proposePhases(['exacto'], [module], 1000);
+
+    expect(result.moduleSubtotal).toBe(35);
+    expect(result.suggestedPrice).toBe(35);
+    expect(result.minimumPrice).toBeGreaterThan(result.suggestedPrice);
+    expect(phases[0].amount).toBe(35);
+  });
+
   it('excluye modulos deshabilitados y sus dependientes del alcance vivo', () => {
     const modules = initialModules.map((module) => module.id === 'productos' ? { ...module, active: false } : module);
     const selected = resolveDependencies(['pos'], modules);

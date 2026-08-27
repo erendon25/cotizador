@@ -233,6 +233,9 @@ input:focus, select:focus, textarea:focus { border-color: #5a987c; box-shadow: 0
 .quoted-field small.normal { color: var(--green); }
 .quoted-field small.advertencia { color: var(--amber); }
 .quoted-field small.critico { color: var(--red); }
+.technical-warning { margin-bottom: 18px; padding: 13px 15px; color: #843d35; background: var(--red-soft); border-left: 3px solid var(--red); }
+.technical-warning strong { font-size: 11px; }
+.technical-warning p { margin: 4px 0 0; font-size: 10px; line-height: 1.45; }
 .budget-warning { margin-bottom: 18px; padding: 13px 15px; color: #76511f; background: var(--amber-soft); border-left: 3px solid #c58227; }
 .budget-warning strong { font-size: 11px; }
 .budget-warning p { margin: 4px 0 0; font-size: 10px; line-height: 1.45; }

@@ -64,13 +64,6 @@ export interface QuoteVersionSummary {
   highest: number;
 }
 
-export const COMPLEXITY_MULTIPLIER: Record<Complexity, number> = {
-  BAJA: 1,
-  MEDIA: 1.15,
-  ALTA: 1.3,
-  MUY_ALTA: 1.5,
-};
-
 export function recommendArchitecture(intake: Intake): Recommendation {
   if (intake.offlineRequired && intake.branches > 1) {
     return {
@@ -146,15 +139,12 @@ export function calculatePrice(
   config: PricingConfig,
 ): PriceResult {
   const selected = modules.filter((module) => module.active && selectedIds.includes(module.id));
-  const moduleSubtotal = selected.reduce(
-    (total, module) => total + module.price * COMPLEXITY_MULTIPLIER[module.complexity],
-    0,
-  );
+  const moduleSubtotal = selected.reduce((total, module) => total + module.price, 0);
   const totalHours = selected.reduce((total, module) => total + module.hours, 0);
   const technicalCost = totalHours * config.hourlyRate;
   const priceByMargin = config.targetMargin >= 1 ? technicalCost : technicalCost / (1 - config.targetMargin);
   const minimumPrice = Math.max(technicalCost, priceByMargin);
-  const suggestedPrice = Math.ceil(Math.max(moduleSubtotal, minimumPrice) / 50) * 50;
+  const suggestedPrice = moduleSubtotal;
   const rawWeeks = config.weeklyCapacity > 0 ? totalHours / config.weeklyCapacity : 0;
 
   return {
@@ -216,7 +206,7 @@ export function proposePhases(
   let current: Phase = { name: 'Fase 1', moduleIds: [], amount: 0 };
 
   selected.forEach((module) => {
-    const amount = module.price * COMPLEXITY_MULTIPLIER[module.complexity];
+    const amount = module.price;
     const shouldStartNext = budget > 0 && current.moduleIds.length > 0 && current.amount + amount > budget;
     if (shouldStartNext) {
       phases.push(current);

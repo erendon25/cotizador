@@ -37,3 +37,10 @@
 - Metricas calculadas exclusivamente desde snapshots guardados en Neon.
 - Configuracion con estado de cuenta, sincronizacion y acceso al tarifario.
 - Estados vacios reales para proyectos y pagos sin registros.
+
+## 0.2.4 - 2026-08-27
+
+- Precio automatico igual a la suma exacta del tarifario y sus dependencias.
+- Eliminacion de multiplicadores y redondeos ocultos sobre precios editados.
+- Minimo tecnico convertido en advertencia visible, sin sustituir el tarifario.
+- Precio visible para cada dependencia incorporada al alcance.
