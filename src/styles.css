@@ -20,6 +20,7 @@
 }
 
 * { box-sizing: border-box; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
@@ -137,6 +138,27 @@ td small { margin-top: 2px; color: #92979d; font-size: 10px; }
 .catalog-toggle input:checked + i { background: var(--green); }
 .catalog-toggle input:checked + i::after { transform: translateX(14px); }
 .catalog-toggle span { color: #676d73; font-size: 9px; font-weight: 700; }
+.modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(19, 23, 22, .58); }
+.module-editor { width: min(720px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: white; border: 1px solid #d9dcd7; border-radius: 7px; box-shadow: 0 22px 65px rgba(0, 0, 0, .28); }
+.module-editor > header { position: sticky; z-index: 1; top: 0; min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 20px; background: white; border-bottom: 1px solid var(--line); }
+.module-editor h2 { margin: 2px 0 0; font: 700 17px Manrope, sans-serif; }
+.module-editor form { padding: 20px; }
+.editor-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.editor-fields > label { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.editor-fields > label > span, .dependency-picker legend { color: #4f555c; font-size: 11px; font-weight: 700; }
+.dependency-picker { min-width: 0; margin: 20px 0 0; padding: 0; border: 0; }
+.dependency-picker p { margin: 4px 0 10px; color: #858b91; font-size: 10px; }
+.dependency-picker > div { max-height: 180px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; overflow-y: auto; padding: 8px; background: #f7f8f6; border: 1px solid var(--line); border-radius: 6px; }
+.dependency-picker label, .editor-active { min-width: 0; display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 8px; cursor: pointer; }
+.dependency-picker label { min-height: 42px; padding: 6px 8px; background: white; border: 1px solid #e4e6e2; border-radius: 5px; }
+.dependency-picker input, .editor-active input { position: absolute; opacity: 0; pointer-events: none; }
+.dependency-picker label > span:last-child, .editor-active > span:last-child { min-width: 0; display: flex; flex-direction: column; }
+.dependency-picker strong, .editor-active strong { overflow: hidden; color: #34393e; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.dependency-picker small, .editor-active small { margin-top: 2px; color: #8a9096; font-size: 9px; }
+.dependency-picker input:checked + .check-control, .editor-active input:checked + .check-control { background: var(--green); border-color: var(--green); }
+.editor-active { margin-top: 16px; padding: 11px 12px; background: var(--green-soft); border-radius: 6px; }
+.editor-error { margin-top: 14px; padding: 10px 12px; color: #92372f; background: var(--red-soft); border-left: 3px solid var(--red); font-size: 10px; }
+.module-editor footer { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 
 .quote-page { max-width: 1260px; margin: 0 auto; }
 .quote-heading { align-items: center; }
@@ -343,6 +365,10 @@ input:focus, select:focus, textarea:focus { border-color: #5a987c; box-shadow: 0
   .settings-panel { padding: 15px; }
   .settings-row { grid-template-columns: 38px minmax(0, 1fr); }
   .settings-row > em, .settings-row > button { grid-column: 2; justify-self: start; text-align: left; }
+  .modal-backdrop { align-items: end; padding: 0; }
+  .module-editor { max-height: 92vh; border-radius: 7px 7px 0 0; }
+  .editor-fields, .dependency-picker > div { grid-template-columns: 1fr; }
+  .module-editor footer { position: sticky; bottom: -20px; margin-inline: -20px; padding: 14px 20px 20px; background: white; }
 }
 
 @media print {

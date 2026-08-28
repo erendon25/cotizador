@@ -17,6 +17,7 @@ import {
   LogOut,
   Menu,
   PackageOpen,
+  Pencil,
   Plus,
   Search,
   Settings,
@@ -29,8 +30,10 @@ import {
 } from 'lucide-react';
 import {
   calculatePrice,
+  createModuleId,
   discountStatus,
   effectiveQuotedPrice,
+  hasDependencyCycle,
   parseMoneyInput,
   proposePhases,
   recommendArchitecture,
@@ -393,6 +396,8 @@ function SettingsView({ user, syncStatus, activeModules, onCatalog }: { user: { 
 }
 
 function Catalog({ modules, setModules, query, onTariffChange }: { modules: ModuleDefinition[]; setModules: React.Dispatch<React.SetStateAction<ModuleDefinition[]>>; query: string; onTariffChange: () => void }) {
+  const [editor, setEditor] = useState<{ mode: 'new' | 'edit'; draft: ModuleDefinition } | null>(null);
+  const [editorError, setEditorError] = useState('');
   const filtered = modules.filter((module) => `${module.name} ${module.category}`.toLowerCase().includes(query.toLowerCase()));
   const activeCount = modules.filter((module) => module.active).length;
   const updateModule = (id: string, changes: Partial<Pick<ModuleDefinition, 'price' | 'active'>>) => {
@@ -400,7 +405,74 @@ function Catalog({ modules, setModules, query, onTariffChange }: { modules: Modu
     onTariffChange();
   };
 
-  return <><div className="page-heading"><div><p className="eyebrow">CONFIGURACION COMERCIAL</p><h1>Tarifario</h1><p>Precios base, horas y dependencias. Los cambios actualizan borradores, no snapshots guardados.</p></div><button className="primary-button"><Plus size={18} />Nuevo modulo</button></div><section className="panel"><div className="section-heading catalog-heading"><div><h2>{activeCount} modulos habilitados</h2><p>Valor hora interno: {money(pricingConfig.hourlyRate)} · Margen objetivo: {pricingConfig.targetMargin * 100}%</p></div></div><div className="responsive-table"><table><thead><tr><th>Modulo</th><th>Estado</th><th>Complejidad</th><th>Horas</th><th>Dependencias</th><th>Precio base</th></tr></thead><tbody>{filtered.map((module) => <tr key={module.id} className={module.active ? '' : 'inactive-row'}><td><strong>{module.name}</strong><small>{module.category} · {module.priority}</small></td><td><label className="catalog-toggle"><input type="checkbox" checked={module.active} onChange={(event) => updateModule(module.id, { active: event.target.checked })} /><i /><span>{module.active ? 'Habilitado' : 'Deshabilitado'}</span></label></td><td><span className="status neutral">{module.complexity.replace('_', ' ')}</span></td><td>{module.hours} h</td><td>{module.dependencies.length ? module.dependencies.join(', ') : 'Ninguna'}</td><td><label className="price-input"><span>S/</span><input type="text" inputMode="numeric" value={module.price || ''} placeholder="0" disabled={!module.active} onChange={(event) => updateModule(module.id, { price: parseMoneyInput(event.target.value) })} /></label></td></tr>)}</tbody></table></div></section></>;
+  const openNewModule = () => {
+    setEditorError('');
+    setEditor({
+      mode: 'new',
+      draft: { id: '', name: '', category: '', price: 0, hours: 1, complexity: 'BAJA', priority: 'IMPORTANTE', dependencies: [], active: true },
+    });
+  };
+
+  const openModule = (module: ModuleDefinition) => {
+    setEditorError('');
+    setEditor({ mode: 'edit', draft: { ...module, dependencies: [...module.dependencies] } });
+  };
+
+  const saveModule = () => {
+    if (!editor) return;
+    const name = editor.draft.name.trim();
+    const category = editor.draft.category.trim();
+    if (!name || !category) {
+      setEditorError('El nombre y la categoria son obligatorios.');
+      return;
+    }
+    if (!Number.isFinite(editor.draft.price) || editor.draft.price < 0 || !Number.isFinite(editor.draft.hours) || editor.draft.hours <= 0) {
+      setEditorError('El precio debe ser cero o mayor y las horas deben ser mayores que cero.');
+      return;
+    }
+
+    const id = editor.mode === 'new'
+      ? createModuleId(name, modules.map((module) => module.id))
+      : editor.draft.id;
+    const savedModule: ModuleDefinition = {
+      ...editor.draft,
+      id,
+      name,
+      category,
+      price: Math.round(editor.draft.price),
+      hours: Math.round(editor.draft.hours),
+      dependencies: editor.draft.dependencies.filter((dependency) => dependency !== id && modules.some((module) => module.id === dependency)),
+    };
+    const nextModules = editor.mode === 'new'
+      ? [...modules, savedModule]
+      : modules.map((module) => module.id === id ? savedModule : module);
+    if (hasDependencyCycle(nextModules)) {
+      setEditorError('No se puede guardar porque las dependencias forman un ciclo.');
+      return;
+    }
+
+    setModules(nextModules);
+    onTariffChange();
+    setEditor(null);
+  };
+
+  return <><div className="page-heading"><div><p className="eyebrow">CONFIGURACION COMERCIAL</p><h1>Tarifario</h1><p>Precios base, horas y dependencias. Los cambios actualizan borradores, no snapshots guardados.</p></div><button className="primary-button" onClick={openNewModule}><Plus size={18} />Nuevo modulo</button></div><section className="panel"><div className="section-heading catalog-heading"><div><h2>{activeCount} modulos habilitados</h2><p>Valor hora interno: {money(pricingConfig.hourlyRate)} · Margen objetivo: {pricingConfig.targetMargin * 100}%</p></div></div><div className="responsive-table"><table><thead><tr><th>Modulo</th><th>Estado</th><th>Complejidad</th><th>Horas</th><th>Dependencias</th><th>Precio base</th><th><span className="sr-only">Acciones</span></th></tr></thead><tbody>{filtered.map((module) => <tr key={module.id} className={module.active ? '' : 'inactive-row'}><td><strong>{module.name}</strong><small>{module.category} · {module.priority}</small></td><td><label className="catalog-toggle"><input type="checkbox" checked={module.active} onChange={(event) => updateModule(module.id, { active: event.target.checked })} /><i /><span>{module.active ? 'Habilitado' : 'Deshabilitado'}</span></label></td><td><span className="status neutral">{module.complexity.replace('_', ' ')}</span></td><td>{module.hours} h</td><td>{module.dependencies.length ? module.dependencies.map((id) => modules.find((candidate) => candidate.id === id)?.name ?? id).join(', ') : 'Ninguna'}</td><td><label className="price-input"><span>S/</span><input type="text" inputMode="numeric" value={module.price || ''} placeholder="0" disabled={!module.active} onChange={(event) => updateModule(module.id, { price: parseMoneyInput(event.target.value) })} aria-label={`Precio de ${module.name}`} /></label></td><td><button className="icon-button" onClick={() => openModule(module)} title={`Editar ${module.name}`} aria-label={`Editar ${module.name}`}><Pencil size={16} /></button></td></tr>)}</tbody></table></div></section>{editor ? <ModuleEditor editor={editor} modules={modules} error={editorError} onChange={(draft) => { setEditor({ ...editor, draft }); setEditorError(''); }} onCancel={() => setEditor(null)} onSave={saveModule} /> : null}</>;
+}
+
+function ModuleEditor({ editor, modules, error, onChange, onCancel, onSave }: { editor: { mode: 'new' | 'edit'; draft: ModuleDefinition }; modules: ModuleDefinition[]; error: string; onChange: (draft: ModuleDefinition) => void; onCancel: () => void; onSave: () => void }) {
+  const { draft } = editor;
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onCancel]);
+
+  const setField = <K extends keyof ModuleDefinition>(key: K, value: ModuleDefinition[K]) => onChange({ ...draft, [key]: value });
+  const toggleDependency = (id: string) => setField('dependencies', draft.dependencies.includes(id)
+    ? draft.dependencies.filter((dependency) => dependency !== id)
+    : [...draft.dependencies, id]);
+
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}><section className="module-editor" role="dialog" aria-modal="true" aria-labelledby="module-editor-title"><header><div><p className="eyebrow">TARIFARIO</p><h2 id="module-editor-title">{editor.mode === 'new' ? 'Nuevo modulo' : 'Editar modulo'}</h2></div><button type="button" className="icon-button" onClick={onCancel} title="Cerrar" aria-label="Cerrar editor"><X size={18} /></button></header><form onSubmit={(event) => { event.preventDefault(); onSave(); }}><div className="editor-fields"><label><span>Nombre</span><input autoFocus value={draft.name} onChange={(event) => setField('name', event.target.value)} placeholder="Ej. Facturacion electronica" /></label><label><span>Categoria</span><input value={draft.category} onChange={(event) => setField('category', event.target.value)} placeholder="Ej. Integraciones" /></label><label><span>Precio base</span><div className="money-field"><span>S/</span><input type="number" min="0" step="1" value={draft.price} onChange={(event) => setField('price', Number(event.target.value))} /></div></label><label><span>Horas estimadas</span><input type="number" min="1" step="1" value={draft.hours} onChange={(event) => setField('hours', Number(event.target.value))} /></label><label><span>Complejidad</span><select value={draft.complexity} onChange={(event) => setField('complexity', event.target.value as ModuleDefinition['complexity'])}><option value="BAJA">Baja</option><option value="MEDIA">Media</option><option value="ALTA">Alta</option><option value="MUY_ALTA">Muy alta</option></select></label><label><span>Prioridad</span><select value={draft.priority} onChange={(event) => setField('priority', event.target.value as ModuleDefinition['priority'])}><option value="CRITICO">Critico</option><option value="IMPORTANTE">Importante</option><option value="OPCIONAL">Opcional</option><option value="FUTURO">Futuro</option></select></label></div><fieldset className="dependency-picker"><legend>Dependencias</legend><p>Selecciona los modulos que deben incluirse antes que este.</p><div>{modules.filter((module) => module.id !== draft.id).map((module) => <label key={module.id}><input type="checkbox" checked={draft.dependencies.includes(module.id)} onChange={() => toggleDependency(module.id)} /><span className="check-control">{draft.dependencies.includes(module.id) ? <Check size={13} /> : null}</span><span><strong>{module.name}</strong><small>{module.category}</small></span></label>)}</div></fieldset><label className="editor-active"><input type="checkbox" checked={draft.active} onChange={(event) => setField('active', event.target.checked)} /><span className="check-control">{draft.active ? <Check size={13} /> : null}</span><span><strong>Modulo habilitado</strong><small>Disponible para cotizaciones nuevas y borradores abiertos.</small></span></label>{error ? <div className="editor-error" role="alert">{error}</div> : null}<footer><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button><button type="submit" className="primary-button"><Check size={17} />Guardar modulo</button></footer></form></section></div>;
 }
 
 interface QuoteWorkspaceProps {

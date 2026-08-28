@@ -64,6 +64,42 @@ export interface QuoteVersionSummary {
   highest: number;
 }
 
+export function createModuleId(name: string, existingIds: string[]): string {
+  const base = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'modulo';
+  const used = new Set(existingIds);
+  if (!used.has(base)) return base;
+
+  let suffix = 2;
+  while (used.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+export function hasDependencyCycle(modules: ModuleDefinition[]): boolean {
+  const byId = new Map(modules.map((module) => [module.id, module]));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  const visit = (id: string): boolean => {
+    if (visiting.has(id)) return true;
+    if (visited.has(id)) return false;
+    const module = byId.get(id);
+    if (!module) return false;
+
+    visiting.add(id);
+    const cycleFound = module.dependencies.some((dependency) => visit(dependency));
+    visiting.delete(id);
+    visited.add(id);
+    return cycleFound;
+  };
+
+  return modules.some((module) => visit(module.id));
+}
+
 export function recommendArchitecture(intake: Intake): Recommendation {
   if (intake.offlineRequired && intake.branches > 1) {
     return {

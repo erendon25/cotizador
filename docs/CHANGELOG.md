@@ -44,3 +44,11 @@
 - Eliminacion de multiplicadores y redondeos ocultos sobre precios editados.
 - Minimo tecnico convertido en advertencia visible, sin sustituir el tarifario.
 - Precio visible para cada dependencia incorporada al alcance.
+
+## 0.2.5 - 2026-08-28
+
+- Creacion funcional de modulos desde el tarifario.
+- Edicion completa de nombre, categoria, precio, horas, complejidad, prioridad, dependencias y estado.
+- Identificadores unicos generados automaticamente para modulos nuevos.
+- Prevencion de ciclos de dependencias antes de guardar cambios.
+- Nombres legibles de dependencias y acciones de edicion accesibles en la tabla.

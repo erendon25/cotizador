@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePrice, effectiveQuotedPrice, parseMoneyInput, proposePhases, recommendArchitecture, resolveDependencies, summarizeQuoteVersions } from './domain';
+import { calculatePrice, createModuleId, effectiveQuotedPrice, hasDependencyCycle, parseMoneyInput, proposePhases, recommendArchitecture, resolveDependencies, summarizeQuoteVersions } from './domain';
 import { initialModules, pricingConfig } from './data';
 
 describe('motor de arquitectura', () => {
@@ -96,5 +96,23 @@ describe('precios y alcance', () => {
 
     expect(result).toEqual({ count: 3, total: 3000, average: 1000, highest: 1800 });
     expect(summarizeQuoteVersions([])).toEqual({ count: 0, total: 0, average: 0, highest: 0 });
+  });
+});
+
+describe('administracion del tarifario', () => {
+  it('genera identificadores estables y unicos para modulos nuevos', () => {
+    expect(createModuleId('Gestion de almacenes', [])).toBe('gestion-de-almacenes');
+    expect(createModuleId('Gestion de almacenes', ['gestion-de-almacenes'])).toBe('gestion-de-almacenes-2');
+    expect(createModuleId('Áreas y categorías', [])).toBe('areas-y-categorias');
+  });
+
+  it('detecta dependencias circulares antes de guardar el tarifario', () => {
+    const modules = [
+      { ...initialModules[0], id: 'a', dependencies: ['b'] },
+      { ...initialModules[1], id: 'b', dependencies: ['a'] },
+    ];
+
+    expect(hasDependencyCycle(modules)).toBe(true);
+    expect(hasDependencyCycle(initialModules)).toBe(false);
   });
 });
